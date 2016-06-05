@@ -1,7 +1,6 @@
 module Main where
 
-import Lib
-import StartingOut
+import InputOutput
 
 main :: IO ()
-main = doubleMe 5
+main = helloWorld
