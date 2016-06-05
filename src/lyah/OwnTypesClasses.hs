@@ -10,7 +10,7 @@ module OwnTypesClasses
     , baseRect
     ) where
 
-import Data.Map as M
+import qualified Data.Map as M
 
 data Point = Point Float Float deriving (Show)
 data Shape = Circle Point Float | Rectangle Point Point deriving (Show)
@@ -126,3 +126,187 @@ type AssocList k v = [(k,v)]
 -- we can partially apply type parameters and get new type constructors from them
 type IntMap = M.Map Int -- supplies a key type-parameter but misses the value type-parameter
 
+
+
+data LockerState = Taken | Free deriving (Show, Eq)
+
+type Code = String
+
+type LockerMap = M.Map Int (LockerState, Code)
+
+
+lockerLookup :: Int -> LockerMap -> Either String Code
+lockerLookup lockerNumber map =
+    case M.lookup lockerNumber map of
+        Nothing -> Left $ "Locker number " ++ show lockerNumber ++ " doesn't exist!"
+        Just (state, code) -> if state /= Taken
+                                then Right code
+                                else Left $ "Locker " ++ show lockerNumber ++ " is already taken!"
+
+lockers :: LockerMap
+lockers = M.fromList
+    [(100,(Taken,"ZD39I"))
+    ,(101,(Free,"JAH3I"))
+    ,(103,(Free,"IQSA9"))
+    ,(105,(Free,"QOTSA"))
+    ,(109,(Taken,"893JJ"))
+    ,(110,(Taken,"99292"))
+    ]
+
+-- === Recursive data structures === --
+
+-- fixity declaration; *'s fixity is infixl 7 * and +'s fixity is infixl 6; both left-associative, * binds stronger than +
+infixr 5 :-:
+data List a = Empty | a :-: (List a) deriving (Show, Read, Eq, Ord)
+
+infixr 5  .++
+(.++) :: List a -> List a -> List a
+Empty .++ ys = ys
+(x :-: xs) .++ ys = x :-: (xs .++ ys)
+-- pattern matching is actually about matching constructors
+
+
+data Tree a = EmptyTree | Node a (Tree a) (Tree a) deriving (Show, Read, Eq)
+
+singleton :: a -> Tree a
+singleton x = Node x EmptyTree EmptyTree
+
+treeInsert :: (Ord a) => a -> Tree a -> Tree a
+treeInsert x EmptyTree = singleton x
+treeInsert x (Node a left right)
+    | x == a = Node x left right
+    | x < a  = Node a (treeInsert x left) right
+    | x > a  = Node a left (treeInsert x right)
+
+-- checks whether the value of the first argument is contained in the tree
+treeElem :: (Ord a) => a -> Tree a -> Bool
+treeElem x EmptyTree = False
+treeElem x (Node a left right)
+    | x == a = True
+    | x < a  = treeElem x left
+    | x > a  = treeElem x right
+
+treeInsertAll :: (Ord a) => Tree a -> [a] -> Tree a
+treeInsertAll = foldr treeInsert
+
+treeNumbers = [8,6,4,1,7,3,5]
+numericTree = treeInsertAll EmptyTree treeNumbers
+tenNotInTree = 10 `treeElem` numericTree == False
+sevenInTree = 7 `treeElem` numericTree
+
+
+-- === Typeclasses 102 === --
+
+--  class is for defining new typeclasses and instance is for making our types instances
+
+data TrafficLight = Red | Yellow | Green
+
+instance Eq TrafficLight where
+    Red == Red = True
+    Green == Green = True
+    Yellow == Yellow = True
+    _ == _ = False
+
+-- Because == (in Eq class) is defined in terms of /= and vice versa, we only had to overwrite one of them
+-- in the instance declaration to create a "minimal complete definition"
+
+instance Show TrafficLight where
+    show Red = "Red light"
+    show Yellow = "Yellow light"
+    show Green = "Green light"
+
+
+-- Self-assigned exercise: Create an ad hoc (join-semi-lattice-like) class and a parameterized instance for inclusive-or
+infixl 6  ***
+class LatticeLike a where
+  (***) :: a -> a -> a -- least-upperbound
+
+data Ior a b = This a | That b | Both a b deriving (Show)
+
+instance (Ord a, Ord b) => LatticeLike (Ior a b) where
+  This a1 *** This a2 = This $ max a1 a2
+  That b1 *** That b2 = That $ max b1 b2
+  Both a1 b1 *** Both a2 b2 = Both (max a1 a2) (max b1 b2)
+  This a *** That b = Both a b
+  This a1 *** Both a2 b = Both (max a1 a2) b
+  That b1 *** Both a b2 = Both a (max b1 b2)
+  first *** second = second *** first -- three more cases to be exhaustive, but they are just mirrored
+
+
+-- === Yes-No typeclass === --
+class YesNo a where
+    yesno :: a -> Bool
+
+-- emulating more flexible boolean semantics: values that represent non-emptiness evaluate to true, otherwise false
+
+instance YesNo Int where
+    yesno 0 = False
+    yesno _ = True
+
+instance YesNo [a] where -- this also includes Strings of course
+    yesno [] = False
+    yesno _ = True
+
+instance YesNo Bool where
+    yesno = id
+
+instance YesNo (Maybe a) where
+    yesno (Just _) = True
+    yesno Nothing = False
+
+instance YesNo (Tree a) where
+    yesno EmptyTree = False
+    yesno _ = True
+
+instance YesNo TrafficLight where
+    yesno Red = False
+    yesno _ = True
+
+-- mimick if functionality using YesNo
+yesnoIf :: (YesNo y) => y -> a -> a -> a
+yesnoIf yesnoVal yesResult noResult = if yesno yesnoVal then yesResult else noResult
+
+
+-- === Functor Typeclass === --
+instance Functor Tree where
+    fmap f EmptyTree = EmptyTree
+    fmap f (Node x leftsub rightsub) = Node (f x) (fmap f leftsub) (fmap f rightsub)
+
+
+instance Functor (Ior a) where
+    fmap f (That b) = That $ f b
+    fmap f (Both a b) = Both a $ f b
+    fmap f (This a) = This a
+
+-- If we use fmap (\a -> a) (the identity function, which just returns its parameter) over some list, we expect to get back the same list as a result
+
+
+-- === Kinds and some type-foo === --
+
+-- Types are little labels that values carry so that we can reason about the values.
+-- But types have their own little labels, called kinds; A kind is more or less the type of a type
+
+-- A * means that the type is a concrete type
+-- A concrete type is a type that doesn't take any type parameters and values can only have types that are concrete types
+
+-- We use :k on a type to get its kind, just like we can use :t on a value to get its type
+
+-- Type constructors are curried (just like functions), so we can partially apply them
+-- ghci> :k Either String
+-- Either String :: * -> *
+-- ghci> :k Either String Int
+-- Either String Int :: *
+
+class Tofu t where
+    tofu :: j a -> t a j
+
+data Frank a b  = Frank {frankField :: b a} deriving (Show)
+
+instance Tofu Frank where
+    tofu x = Frank x
+
+
+data Barry t k p = Barry { yabba :: p, dabba :: t k } deriving (Show)
+
+instance Functor (Barry t k) where
+  fmap f (Barry { yabba = p, dabba = q }) = Barry { yabba = f p, dabba = q }
