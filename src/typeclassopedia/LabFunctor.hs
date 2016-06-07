@@ -1,5 +1,7 @@
 module LabFunctor where
 
+import Control.Applicative
+
 -- Exercise 1: Functor instance for Either --
 
 -- first define our own Either, to not clash with the default one
@@ -57,9 +59,9 @@ instance (Functor f1, Functor f2) => Functor (Compose f1 f2) where
 
 -- Exercise 1: Give an example of a (bogus) Functor instance which satisfies the second law but not the first
 
-data BogusType x = Nothing | Bogus x deriving (Show)
+data BogusType x = Bottom | Bogus x deriving (Show)
 instance Functor BogusType where
-  fmap f _ = Nothing -- Respects the composition law because result will be Nothing regardless, but identity law is violated
+  fmap f _ = Bottom -- Respects the composition law because result will be Bottom regardless, but identity law is violated
 
 -- Exercise 2: Which functor laws are violated by the evil Functor instance
 -- -- Evil Functor instance
@@ -68,5 +70,42 @@ instance Functor BogusType where
 --   fmap g (x:xs) = g x : g x : fmap g xs
 
 -- identity law is violated: fmap id [x] = [x, x] =/= id
--- composition law is violated: fmap id.id [x] =/= (fmap id) . (fmap id) [x]
+-- composition law is violated: fmap (id . id) [x] =/= (fmap id) . (fmap id) [x]
 
+
+-- == Applicative Functor == --
+
+-- LAWS
+-- Identity law:    pure id <*> v = v
+-- Homomorphism:    pure f <*> pure x = pure (f x)
+-- Interchange:     u <*> pure y = pure ($ y) <*> u
+-- Composition:     u <*> (v <*> w) = pure (.) <*> u <*> v <*> w
+
+-- Proof exercise: Prove a variant of the interchange law: "pure f <*> x = pure (flip ($)) <*> x <*> pure f", using the laws
+
+-- Proof:
+--  1)  pure f <*> x = pure (flip ($)) <*> x <*> pure f\
+--  2)  TODO
+
+--- Exercise 1: Applicative instance for (custom) maybe
+data CustomMaybe a = None | Some a
+
+instance Functor CustomMaybe where
+    fmap f None = None
+    fmap f (Some a) = Some $ f a
+
+instance Applicative CustomMaybe where
+    pure =  Some
+    (Some f) <*> maybeA = fmap f maybeA
+    _ <*> _ = None
+
+-- Exercise 2: Determine the correct definition of pure for the ZipList instance of Applicative
+
+newtype ZipList2 a = ZipList2 { getZipList :: [a] }
+
+instance Functor ZipList2 where
+  fmap f (ZipList2 a) = ZipList2 $ fmap f a
+
+instance Applicative ZipList2 where
+  pure a = ZipList2 [a]
+  (ZipList2 gs) <*> (ZipList2 xs) = ZipList2 (zipWith ($) gs xs)
