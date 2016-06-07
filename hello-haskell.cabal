@@ -19,6 +19,7 @@ library
                        , src/typeclassopedia
   exposed-modules:     Lib, InputOutput
   build-depends:       base >= 4.7 && < 5
+                       , directory
   default-language:    Haskell2010
 
 executable hello-haskell-exe
@@ -26,6 +27,7 @@ executable hello-haskell-exe
   main-is:             Main.hs
   ghc-options:         -threaded -rtsopts -with-rtsopts=-N
   build-depends:       base
+                     , directory
                      , hello-haskell
   default-language:    Haskell2010
 
