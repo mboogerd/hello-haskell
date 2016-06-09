@@ -22,9 +22,6 @@ stack new $PROJECTNAME simple
 # Setup GHC for your project
 cd $PROJECTNAME
 stack setup
-
-# Prepare testing dependencies
-stack install QuickCheck
 ```
 
 ### Try it out
@@ -43,6 +40,7 @@ stack test
 ### Configure your project
 
 My early investigation shows that the following works:
+
 1. library hs-source-dirs; make sure any source folders you create are included
 2. library exposed-modules; make sure that modules you use in test or Main are exposed
 3. any build-depends; make sure that libraries you use in `import` statements are included here
@@ -58,7 +56,7 @@ My early investigation shows that the following works:
 
 The gist of writing robust software is clean decomposition of your problem in smaller problems, solving the smaller problems, and composing the solutions together. 
 Solving smaller problems is easier, but testing whether each partial solution is well-behaved is essential. Property-based testing is a great tool for functionally written solutions.
-The de-facto library for property-based testing in Haskell is QuickCheck:
+The de-facto library for property-based testing in Haskell is [QuickCheck](http://www.cse.chalmers.se/~rjmh/QuickCheck/manual.html):
 
 ```bash
 stack install QuickCheck
@@ -66,7 +64,7 @@ stack install QuickCheck
 # Also, include QuickCheck in your test's build-depends
 ```
 
-Now, without being a professor in mathematics, you can give strong statistical evidence that your code behaves lawfully!
+Now, without being a professor in mathematics, you too can give strong statistical evidence that your code behaves lawfully!
 
 ```haskell
 import Prelude (($), (.), (+))
@@ -76,7 +74,7 @@ import Test.QuickCheck
 -- Some type
 newtype ZipList2 a = ZipList2 { getZipList2 :: [a] } deriving (Show, Eq)
 
--- Typeclass instance definitions; Our ZipList is a Applicative Functor
+-- Typeclass instance definitions; Our ZipList is an Applicative Functor
 instance Functor ZipList2 where
   fmap f (ZipList2 a) = ZipList2 $ fmap f a
 
@@ -96,3 +94,5 @@ law_applicative_identity_ziplist v = (pure id <*> v) == v
 
 main = quickCheck law_applicative_identity_ziplist
 ```
+
+More starting info can be found [here](http://chromaticleaves.com/posts/generate-user-data-quickcheck.html)
