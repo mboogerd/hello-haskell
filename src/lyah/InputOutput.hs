@@ -1,10 +1,11 @@
 module InputOutput where
 
-import System.IO
-import System.Directory
 import Control.Monad
 import Data.Char
 import Data.List
+import System.Directory
+import System.Environment
+import System.IO
 
 -- The empty tuple is a value of () and it also has a type of ()
 -- An I/O action will be performed when we give it a name of main and then run our program
@@ -46,9 +47,9 @@ reverseInputs = do
     line <- getLine
     if null line
         then return () -- makes an I/O action out of a pure value
-        else do
-            putStrLn $ reverseWords line
-            reverseInputs
+    else do
+        putStrLn $ reverseWords line
+        reverseInputs
 
 reverseWords :: String -> String
 reverseWords = unwords . map reverse . words
@@ -98,7 +99,7 @@ uppercaseAllInput = forever $ do
 -- think of it as meaning: make an I/O action for every element in this list; perform those actions and bind their results to something
 colorAssociation :: IO ()
 colorAssociation = do
-    colors <- forM [1,2,3,4] (\a -> do
+    colors <- forM [1, 2, 3, 4] (\a -> do
         putStrLn $ "Which color do you associate with the number " ++ show a ++ "?"
         color <- getLine
         return color)
@@ -114,7 +115,7 @@ shortLinesOnly input =
     let allLines = lines input
         shortLines = filter (\line -> length line < 10) allLines
         result = unlines shortLines
-    in  result
+    in result
 
 -- or alternatively: unlines . filter ((<10) . length) . lines
 
@@ -186,3 +187,71 @@ todoMenu = do
       x -> do
         putStrLn $ "ERROR!!! Not programmed to understand input: " ++ x
         todoMenu
+
+
+arguments :: IO ()
+arguments = do
+   args <- getArgs
+   progName <- getProgName
+   putStrLn "The arguments are:"
+   mapM putStrLn args
+   putStrLn "The program name is:"
+   putStrLn progName
+
+
+-- == Complete to-do application == --
+commandHandler :: IO ()
+commandHandler = do
+    (command:args) <- getArgs
+    let (Just action) = lookup command dispatch
+    action args
+
+-- maps the possible commmand (string) literals to implementations
+dispatch :: [(String, [String] -> IO ())]
+dispatch =  [ ("add", add)
+            , ("view", view)
+            , ("remove", remove)
+            , ("bump", bump)
+            ]
+
+-- implementation for adin ga to-do
+add :: [String] -> IO ()
+add [fileName, todoItem] = appendFile fileName (todoItem ++ "\n")
+
+-- implementation for viewing the list of todos
+view :: [String] -> IO ()
+view [fileName] = do
+    contents <- readFile fileName
+    let todoTasks = lines contents
+        numberedTasks = zipWith (\n line -> show n ++ " - " ++ line) [0..] todoTasks
+    putStr $ unlines numberedTasks
+
+-- implementation for removing a to-do
+remove :: [String] -> IO ()
+remove [fileName, numberString] = do
+    handle <- openFile fileName ReadMode
+    (tempName, tempHandle) <- openTempFile "." "temp"
+    contents <- hGetContents handle
+    let number = read numberString
+        todoTasks = lines contents
+        newTodoItems = delete (todoTasks !! number) todoTasks
+    hPutStr tempHandle $ unlines newTodoItems
+    hClose handle
+    hClose tempHandle
+    removeFile fileName
+    renameFile tempName fileName
+
+bump :: [String] -> IO ()
+bump [fileName, indexString] = do
+    handle <- openFile fileName ReadMode
+    (tempName, tempHandle) <- openTempFile "." "temp"
+    contents <- hGetContents handle
+    let index = read indexString
+        todoTasks = lines contents
+        selection = todoTasks !! index
+        newTodoItems = selection : delete selection todoTasks
+    hPutStr tempHandle $ unlines newTodoItems
+    hClose handle
+    hClose tempHandle
+    removeFile fileName
+    renameFile tempName fileName
